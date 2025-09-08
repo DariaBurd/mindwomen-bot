@@ -21,8 +21,12 @@ logger = logging.getLogger(__name__)
 Configuration.account_id = os.getenv('YUKASSA_SHOP_ID')
 Configuration.secret_key = os.getenv('YUKASSA_SECRET_KEY')
 
-# ID канала/чата (отрицательное число для каналов)
-CHANNEL_ID = os.getenv('CHANNEL_ID')  # Например: -1001234567890
+# ID канала/чата
+CHANNEL_ID = os.getenv('CHANNEL_ID')
+ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID')
+
+# 🔥 ИЗМЕНЕНИЕ: Добавила URL картинки
+WELCOME_IMAGE_URL = "https://raw.githubusercontent.com/your-username/mindwomen-bot/main/images/welcome-image.png"
 
 
 class SubscriptionBot:
@@ -69,17 +73,37 @@ class SubscriptionBot:
         self.application.add_handler(CallbackQueryHandler(self.handle_callback))
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Приветственное сообщение при переходе по ссылке"""
+        """Приветственное сообщение с картинкой"""
         user = update.effective_user
 
-        # Проверяем есть ли подписка
-        subscription_end = self.get_user_subscription(user.id)
+        # 🔥 ИЗМЕНЕНИЕ: Красивое приветствие как на скриншоте
+        welcome_text = """
+*(start *eze.*)*
 
-        if subscription_end and subscription_end > datetime.now():
-            # У пользователя есть активная подписка
-            await self.send_welcome_message(update, user, subscription_end)
-        else:
-            # Предлагаем оплатить
+*Что нам на самом деле важно* - это не бояться быть самой собой. Быть среди женщин. Все мы - сестры и отражаясь в глазах сестры мы начинаем видеть себя очень ясно.
+
+*Закрытый Клуб Осознанной Женственности* - это твое безопасное поле, где мы вместе будем практиковать, общаться, создавая общее женское комьюнити осознанности и жизни в моменте здесь и сейчас. 
+
+*Путешествие начинается.* 🌸
+        """
+
+        #  Пытаемся отправить с картинкой
+        try:
+            await update.message.reply_photo(
+                photo=WELCOME_IMAGE_URL,
+                caption=welcome_text,
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            logger.error(f"Ошибка загрузки картинки: {e}")
+            await update.message.reply_text(
+                welcome_text,
+                parse_mode='Markdown'
+            )
+
+        # Проверяем подписку
+        subscription_end = self.get_user_subscription(user.id)
+        if not subscription_end or subscription_end <= datetime.now():
             await self.offer_payment(update, user)
 
     async def send_welcome_message(self, update: Update, user, subscription_end):
@@ -92,8 +116,8 @@ class SubscriptionBot:
 *Что тебя ждет в нашем сообществе:*
 • Ежедневные медитации и практики
 • Закрытый чат с сестрами
-• Поддержка кураторов 24/7
-• Мастер-классы и живые встречи
+• Мое бережное сопровождение
+• Живые встречи
 
 *Ссылка на канал:* @mindwomen_channel
 
@@ -129,8 +153,8 @@ class SubscriptionBot:
 *Что включено:*
 - Доступ к закрытому каналу
 - Все практики и медитации
-- Поддержка кураторов
 - Участие в живых встречах
+- Индивидуальные разборы в Матрице Судьбы
         """
 
         await update.message.reply_text(
@@ -150,6 +174,7 @@ class SubscriptionBot:
 
     async def create_invoice(self, query, period):
         """Создание счета на оплату"""
+        #  Цены
         prices = {
             'month': 555,
             '3months': 1555,
@@ -201,19 +226,10 @@ class SubscriptionBot:
 
         # Добавляем пользователя в канал
         try:
-            await self.application.bot.restrict_chat_member(
+            await self.application.bot.unban_chat_member(  # Используем unban
                 chat_id=CHANNEL_ID,
                 user_id=user.id,
-                permissions={
-                    'can_send_messages': True,
-                    'can_send_media_messages': True,
-                    'can_send_polls': True,
-                    'can_send_other_messages': True,
-                    'can_add_web_page_previews': True,
-                    'can_change_info': False,
-                    'can_invite_users': False,
-                    'can_pin_messages': False
-                }
+                only_if_banned=True
             )
         except BadRequest as e:
             logger.error(f"Ошибка добавления в канал: {e}")
@@ -232,15 +248,13 @@ class SubscriptionBot:
 3. Изучи закрепленные материалы
 4. Участвуй в ежедневных активностях
 
-*По всем вопросам обращайся к кураторам!* 💖
-
 *Для проверки статуса подписки:* /my_subscription
         """
 
         await update.message.reply_text(welcome_text, parse_mode='Markdown')
 
-        # Уведомление админам
-        await self.notify_admins(user, payment, subscription_end)
+        #  Уведомляем владелицу с передачей context
+        await self.notify_admins(user, payment, subscription_end, context)
 
     def calculate_subscription_end(self, period):
         """Рассчитывает дату окончания подписки"""
@@ -337,8 +351,8 @@ class SubscriptionBot:
 
         await update.message.reply_text(text, parse_mode='Markdown')
 
-    async def notify_admins(self, user, payment, subscription_end):
-        """Уведомляет админов о новой подписке"""
+    async def notify_admins(self, user, payment, subscription_end, context):
+        """Уведомляет владелицу о новой подписке"""
         admin_text = f"""
 👑 *Новая подписка MindWomen*
 
@@ -350,8 +364,15 @@ class SubscriptionBot:
 *Время:* {datetime.now().strftime('%Y-%m-%d %H:%M')}
         """
 
-        # Отправляем админам (замените на реальный ID чата админов)
-        # await context.bot.send_message(ADMIN_CHAT_ID, admin_text, parse_mode='Markdown')
+        #  Отправляем сообщение владелице
+        try:
+            await context.bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=admin_text,
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            logger.error(f"Ошибка отправки уведомления: {e}")
 
     def run(self):
         """Запуск бота"""
