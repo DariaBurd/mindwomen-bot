@@ -52,7 +52,7 @@ WELCOME_IMAGE_URL = "https://raw.githubusercontent.com/DariaBurd/mindwomen-bot/m
 class SubscriptionBot:
     def __init__(self, token):
 
-        if not token or token == "8422808480:AAHZpm5zZosuo5xWLnRHeA0GzfcHbenAZUM":
+        if not token or token == "TELEGRAM_BOT_TOKEN":
             logger.error("❌ TELEGRAM_BOT_TOKEN не найден или не установлен!")
             logger.error("Проверь Railway Variables → TELEGRAM_BOT_TOKEN")
             exit(1)
@@ -418,3 +418,4 @@ if __name__ == "__main__":
     bot = SubscriptionBot(BOT_TOKEN)
 
     bot.run()
+
