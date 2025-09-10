@@ -26,7 +26,7 @@ CHANNEL_ID = os.getenv('CHANNEL_ID')
 ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID')
 
 # 🔥 ИЗМЕНЕНИЕ: Добавила URL картинки
-WELCOME_IMAGE_URL = "https://raw.githubusercontent.com/your-username/mindwomen-bot/main/images/welcome-image.png"
+WELCOME_IMAGE_URL = "https://raw.githubusercontent.com/DariaBurd/mindwomen-bot/main/images/welcome.png"
 
 
 class SubscriptionBot:
