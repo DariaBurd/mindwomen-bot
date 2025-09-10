@@ -9,6 +9,7 @@ from telegram.error import BadRequest
 from yandex_checkout import Configuration, Payment
 import sqlite3
 import uuid
+from dotenv import load_dotenv
 
 # Настройка логирования
 logging.basicConfig(
@@ -16,6 +17,25 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+required_vars = [
+    'TELEGRAM_BOT_TOKEN',
+    'YUKASSA_SHOP_ID',
+    'YUKASSA_SECRET_KEY',
+    'YUKASSA_PROVIDER_TOKEN',
+    'CHANNEL_ID',
+    'ADMIN_CHAT_ID'
+]
+
+missing_vars = []
+for var in required_vars:
+    if not os.getenv(var):
+        missing_vars.append(var)
+
+if missing_vars:
+    logger.error(f"❌ Отсутствуют переменные: {missing_vars}")
+    logger.error("Проверь Railway Settings → Variables")
+    exit(1)
 
 # Конфигурация ЮKassa
 Configuration.account_id = os.getenv('YUKASSA_SHOP_ID')
