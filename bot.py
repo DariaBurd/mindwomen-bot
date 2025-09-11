@@ -11,6 +11,8 @@ import sqlite3
 import uuid
 from dotenv import load_dotenv
 
+load_dotenv()
+
 # Настройка логирования
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -52,7 +54,7 @@ WELCOME_IMAGE_URL = "https://raw.githubusercontent.com/DariaBurd/mindwomen-bot/m
 class SubscriptionBot:
     def __init__(self, token):
 
-        if not token or token == "TELEGRAM_BOT_TOKEN":
+        if not token or token == "your_bot_token_here":
             logger.error("❌ TELEGRAM_BOT_TOKEN не найден или не установлен!")
             logger.error("Проверь Railway Variables → TELEGRAM_BOT_TOKEN")
             exit(1)
@@ -81,12 +83,12 @@ class SubscriptionBot:
 
     def setup_tasks(self):
         """Настройка фоновых задач"""
-        self.application.job_queue.run_repeating(
-            self.check_subscriptions,
-            interval=3600,  # Проверка каждый час
-            first=10
-        )
-
+       # self.application.job_queue.run_repeating(
+       #     self.check_subscriptions,
+       #     interval=3600,  # Проверка каждый час
+       #     first=10
+      #  )
+        pass
     def setup_handlers(self):
         """Настройка обработчиков"""
         # Команды
@@ -416,6 +418,4 @@ if __name__ == "__main__":
         exit(1)
 
     bot = SubscriptionBot(BOT_TOKEN)
-
     bot.run()
-
