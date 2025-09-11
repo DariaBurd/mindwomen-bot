@@ -204,9 +204,9 @@ class SubscriptionBot:
         """Создание счета на оплату"""
         #  Цены
         prices = {
-            'month': 555,
-            '3months': 1555,
-            'year': 6130
+            'month': 55500,
+            '3months': 155500,
+            'year': 613000
         }
 
         periods_text = {
@@ -420,3 +420,4 @@ if __name__ == "__main__":
     bot = SubscriptionBot(BOT_TOKEN)
 
     bot.run()
+
