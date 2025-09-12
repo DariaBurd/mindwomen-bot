@@ -147,7 +147,7 @@ class SubscriptionBot:
 • Мое бережное сопровождение
 • Живые встречи
 
-*Ссылка на канал:* @mindwomen_channel
+*Ссылка на канал:* https://t.me/+Yx9m02RdviBmNjAy
 
 *Чтобы проверить статус подписки:* /my_subscription
 
@@ -268,7 +268,7 @@ class SubscriptionBot:
 
 *Твоя подписка активна до:* {subscription_end.strftime('%d.%m.%Y')}
 
-*Ссылка на закрытый канал:* @mindwomen_channel
+*Ссылка на закрытый канал:* https://t.me/+Yx9m02RdviBmNjAy
 
 *Что делать дальше:*
 1. Перейди в канал по ссылке выше
@@ -420,4 +420,5 @@ if __name__ == "__main__":
     bot = SubscriptionBot(BOT_TOKEN)
 
     bot.run()
+
 
