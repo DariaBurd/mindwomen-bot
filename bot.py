@@ -47,7 +47,7 @@ Configuration.secret_key = os.getenv('YUKASSA_SECRET_KEY')
 CHANNEL_ID = os.getenv('CHANNEL_ID')
 ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID')
 
-# 🔥 ИЗМЕНЕНИЕ: Добавила URL картинки
+# Добавила URL картинки
 WELCOME_IMAGE_URL = "https://raw.githubusercontent.com/DariaBurd/mindwomen-bot/main/images/welcome.png"
 
 
@@ -63,7 +63,6 @@ class SubscriptionBot:
         self.setup_handlers()
         self.setup_database()
         self.setup_tasks()
-        # Добавляем обработчик ошибок
         self.application.add_error_handler(self.error_handler)
 
     def setup_database(self):
@@ -119,7 +118,7 @@ class SubscriptionBot:
         """Приветственное сообщение с картинкой"""
         user = update.effective_user
 
-        # 🔥 ИЗМЕНЕНИЕ: Красивое приветствие как на скриншоте
+        # Красивое приветствие как на скриншоте
         welcome_text = """
 *Добро пожаловать, моя прекрасная!*
 
@@ -282,25 +281,42 @@ class SubscriptionBot:
 
         # Добавляем пользователя в канал
         try:
-            # Сначала пробуем добавить как участника
-            await context.bot.unban_chat_member(
+            # Используем restrict_chat_member вместо unban_chat_member
+            await context.bot.restrict_chat_member(
                 chat_id=CHANNEL_ID,
                 user_id=user.id,
-                only_if_banned=True
+                permissions={
+                    'can_send_messages': True,
+                    'can_send_media_messages': True,
+                    'can_send_polls': True,
+                    'can_send_other_messages': True,
+                    'can_add_web_page_previews': True,
+                    'can_change_info': False,
+                    'can_invite_users': False,
+                    'can_pin_messages': False
+                }
             )
             logger.info(f"Пользователь {user.id} добавлен в канал")
+            
         except BadRequest as e:
             if "chat not found" in str(e).lower():
                 logger.error(f"Канал не найден: {CHANNEL_ID}")
                 await update.message.reply_text("❌ Ошибка доступа к каналу. Администратор уведомлен.")
             elif "user is an administrator" in str(e).lower():
                 logger.info(f"Пользователь {user.id} уже админ канала")
+            elif "user not found" in str(e).lower():
+                logger.error(f"Пользователь {user.id} не найден")
             else:
                 logger.error(f"Ошибка добавления в канал: {e}")
+                await update.message.reply_text("❌ Ошибка доступа к каналу. Администратор уведомлен.")
+                
         except Forbidden as e:
             logger.error(f"Нет прав для добавления в канал: {e}")
+            await update.message.reply_text("❌ Ошибка доступа к каналу. Администратор уведомлен.")
+            
         except Exception as e:
             logger.error(f"Неизвестная ошибка при добавлении в канал: {e}")
+            await update.message.reply_text("❌ Ошибка доступа к каналу. Администратор уведомлен.")
 
         # Отправляем приветственное сообщение
         welcome_text = f"""
@@ -319,7 +335,7 @@ class SubscriptionBot:
 *Для проверки статуса подписки:* /my_subscription
         """
 
-        await update.message.reply_text(welcome_text)
+        await update.message.reply_text(welcome_text, parse_mode='Markdown')
 
         # Уведомляем владелицу
         await self.notify_admins(user, payment, subscription_end, context.bot)
@@ -477,5 +493,3 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Критическая ошибка запуска бота: {e}")
         exit(1)
-
-
