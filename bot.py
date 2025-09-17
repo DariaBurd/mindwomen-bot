@@ -335,7 +335,7 @@ class SubscriptionBot:
 *Для проверки статуса подписки:* /my_subscription
         """
 
-        await update.message.reply_text(welcome_text, parse_mode='Markdown')
+        await update.message.reply_text(welcome_text)
 
         # Уведомляем владелицу
         await self.notify_admins(user, payment, subscription_end, context.bot)
@@ -493,3 +493,4 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Критическая ошибка запуска бота: {e}")
         exit(1)
+
