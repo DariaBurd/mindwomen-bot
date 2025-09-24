@@ -20,8 +20,8 @@ logger = logging.getLogger(__name__)
 
 # Проверка обязательных переменных окружения
 required_vars = [
-    'TELEGRAM_BOT_TOKEN',
-    'CHANNEL_ID',
+    'TELEGRAM_BOT_TOKEN', 
+    'CHANNEL_ID', 
     'ADMIN_CHAT_ID',
     'CARD_NUMBER',
     'CARD_HOLDER'
@@ -39,12 +39,10 @@ CHANNEL_ID = os.getenv('CHANNEL_ID')
 ADMIN_CHAT_ID = os.getenv('ADMIN_CHAT_ID')
 CARD_NUMBER = os.getenv('CARD_NUMBER')
 CARD_HOLDER = os.getenv('CARD_HOLDER')
-SUBSCRIPTION_PRICE = os.getenv('SUBSCRIPTION_PRICE', '1000')  # По умолчанию 1000₽
+SUBSCRIPTION_PRICE = os.getenv('SUBSCRIPTION_PRICE', '1000')
 
 # Опциональные переменные
-WELCOME_IMAGE_URL = os.getenv('WELCOME_IMAGE_URL',
-                              "https://raw.githubusercontent.com/DariaBurd/mindwomen-bot/main/images/welcome.png")
-
+WELCOME_IMAGE_URL = os.getenv('WELCOME_IMAGE_URL', "https://raw.githubusercontent.com/DariaBurd/mindwomen-bot/main/images/welcome.png")
 
 class SubscriptionBot:
     def __init__(self, token):
@@ -72,7 +70,7 @@ class SubscriptionBot:
                 joined_date DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-
+        
         # Таблица ожидающих платежей
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS pending_payments (
@@ -152,8 +150,7 @@ class SubscriptionBot:
 
     async def offer_payment(self, update: Update, user):
         """Предложение оплатить подписку"""
-        keyboard = [[InlineKeyboardButton(f"💳 Оплатить подписку - {SUBSCRIPTION_PRICE}₽/месяц",
-                                          callback_data="pay_subscription")]]
+        keyboard = [[InlineKeyboardButton(f"💳 Оплатить подписку - {SUBSCRIPTION_PRICE}₽/месяц", callback_data="pay_subscription")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         text = f"""
@@ -189,7 +186,7 @@ class SubscriptionBot:
     async def send_payment_details(self, query):
         """Отправляет реквизиты для перевода"""
         user = query.from_user
-
+        
         # Сохраняем запрос на оплату
         self.cursor.execute('''
             INSERT INTO pending_payments (user_id, amount) 
@@ -220,7 +217,7 @@ class SubscriptionBot:
     async def handle_screenshot(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка скриншотов от пользователей"""
         user = update.effective_user
-
+        
         if update.message.photo:
             # Находим ожидающий платеж пользователя
             self.cursor.execute('''
@@ -228,12 +225,12 @@ class SubscriptionBot:
                 WHERE user_id = ? AND status = 'pending'
                 ORDER BY created_date DESC LIMIT 1
             ''', (user.id,))
-
+            
             result = self.cursor.fetchone()
-
+            
             if result:
                 payment_id = result[0]
-
+                
                 # Помечаем как отправленный
                 self.cursor.execute('''
                     UPDATE pending_payments SET screenshot_sent = TRUE WHERE id = ?
@@ -298,7 +295,7 @@ class SubscriptionBot:
         self.cursor.execute('''
             SELECT user_id FROM pending_payments WHERE id = ?
         ''', (payment_id,))
-
+        
         result = self.cursor.fetchone()
         if not result:
             await query.message.reply_text("❌ Платеж не найден")
@@ -308,12 +305,15 @@ class SubscriptionBot:
 
         # Активируем подписку (1 месяц)
         subscription_end = datetime.now() + timedelta(days=30)
-        self.save_subscription(user_id, subscription_end)
+        await self.save_subscription(user_id, subscription_end, context.bot)
 
-        # Добавляем в канал
+        # Добавляем в канал (исправляем CHANNEL_ID)
         try:
+            # Убедимся, что CHANNEL_ID правильный (должен начинаться с -100 для супергрупп)
+            channel_id = self.get_correct_channel_id(CHANNEL_ID)
+            
             await context.bot.restrict_chat_member(
-                chat_id=CHANNEL_ID,
+                chat_id=channel_id,
                 user_id=user_id,
                 permissions={
                     'can_send_messages': True,
@@ -326,8 +326,16 @@ class SubscriptionBot:
                     'can_pin_messages': False
                 }
             )
+            logger.info(f"✅ Пользователь {user_id} добавлен в канал {channel_id}")
+            
+        except BadRequest as e:
+            if "chat not found" in str(e).lower():
+                logger.error(f"❌ Канал не найден: {CHANNEL_ID}. Проверьте CHANNEL_ID в настройках.")
+                await query.message.reply_text("❌ Ошибка: канал не найден. Проверьте настройки бота.")
+            else:
+                logger.error(f"❌ Ошибка добавления в канал: {e}")
         except Exception as e:
-            logger.error(f"Ошибка добавления в канал: {e}")
+            logger.error(f"❌ Неизвестная ошибка при добавлении в канал: {e}")
 
         # Уведомляем пользователя
         try:
@@ -355,6 +363,52 @@ class SubscriptionBot:
 
         await query.edit_message_caption(caption="✅ *Платеж подтвержден*\n\nПользователь добавлен в канал")
 
+    def get_correct_channel_id(self, channel_id):
+        """Корректирует ID канала для Telegram API"""
+        # Если это username (@channel), оставляем как есть
+        if isinstance(channel_id, str) and channel_id.startswith('@'):
+            return channel_id
+        
+        # Если это числовой ID, убедимся что он в правильном формате
+        try:
+            channel_id_int = int(channel_id)
+            # Для супергрупп ID должен быть отрицательным и начинаться с -100
+            if channel_id_int < 0 and not str(channel_id_int).startswith('-100'):
+                # Преобразуем в формат -100 + исходный ID
+                return f"-100{abs(channel_id_int)}"
+            return channel_id_int
+        except ValueError:
+            # Если это не число, возвращаем как есть (скорее всего username)
+            return channel_id
+
+    async def save_subscription(self, user_id, subscription_end, bot):
+        """Сохраняет информацию о подписке в БД (исправленная версия)"""
+        try:
+            # Получаем информацию о пользователе через await
+            user_chat = await bot.get_chat(user_id)
+            
+            self.cursor.execute('''
+                INSERT OR REPLACE INTO users (user_id, username, first_name, last_name, subscription_end)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (
+                user_id, 
+                user_chat.username, 
+                user_chat.first_name, 
+                user_chat.last_name, 
+                subscription_end
+            ))
+            self.conn.commit()
+            logger.info(f"✅ Подписка сохранена для пользователя {user_id}")
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка сохранения подписки: {e}")
+            # Если не удалось получить данные пользователя, сохраняем хотя бы ID
+            self.cursor.execute('''
+                INSERT OR REPLACE INTO users (user_id, subscription_end)
+                VALUES (?, ?)
+            ''', (user_id, subscription_end))
+            self.conn.commit()
+
     async def reject_payment(self, update: Update, context: ContextTypes.DEFAULT_TYPE, payment_id):
         """Отклоняет платеж"""
         query = update.callback_query
@@ -363,11 +417,11 @@ class SubscriptionBot:
         self.cursor.execute('''
             SELECT user_id FROM pending_payments WHERE id = ?
         ''', (payment_id,))
-
+        
         result = self.cursor.fetchone()
         if result:
             user_id = result[0]
-
+            
             # Уведомляем пользователя
             try:
                 await context.bot.send_message(
@@ -385,7 +439,6 @@ class SubscriptionBot:
 
         await query.edit_message_caption(caption="❌ *Платеж отклонен*")
 
-    # Остальные методы без изменений
     def get_user_subscription(self, user_id):
         """Получает информацию о подписке пользователя"""
         try:
@@ -400,19 +453,6 @@ class SubscriptionBot:
         except Exception as e:
             logger.error(f"Ошибка получения подписки: {e}")
             return None
-
-    def save_subscription(self, user_id, subscription_end):
-        """Сохраняет информацию о подписке в БД"""
-        try:
-            # Сначала получаем информацию о пользователе
-            user_data = self.application.bot.get_chat(user_id)
-            self.cursor.execute('''
-                INSERT OR REPLACE INTO users (user_id, username, first_name, last_name, subscription_end)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (user_id, user_data.username, user_data.first_name, user_data.last_name, subscription_end))
-            self.conn.commit()
-        except Exception as e:
-            logger.error(f"Ошибка сохранения подписки: {e}")
 
     async def my_subscription(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Показывает информацию о подписке пользователя"""
@@ -453,8 +493,9 @@ class SubscriptionBot:
             for user_id, in expired_users:
                 try:
                     # Удаляем из канала
-                    await context.bot.ban_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
-
+                    channel_id = self.get_correct_channel_id(CHANNEL_ID)
+                    await context.bot.ban_chat_member(chat_id=channel_id, user_id=user_id)
+                    
                     # Уведомляем пользователя
                     try:
                         await context.bot.send_message(
@@ -477,7 +518,6 @@ class SubscriptionBot:
         """Запуск бота"""
         logger.info("Бот запускается...")
         self.application.run_polling()
-
 
 if __name__ == "__main__":
     BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
