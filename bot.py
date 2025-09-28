@@ -199,7 +199,7 @@ class SubscriptionBot:
 
 *Сумма:* {SUBSCRIPTION_PRICE}₽ в месяц
 
-*Реквизиты для перевода:*
+*Реквизиты для перевода (СБЕР):*
 ▫️ *Номер карты:* `{CARD_NUMBER}`
 ▫️ *Получатель:* {CARD_HOLDER}
 
@@ -531,6 +531,7 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Критическая ошибка запуска бота: {e}")
         exit(1)
+
 
 
 
